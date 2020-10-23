@@ -1,0 +1,4 @@
+org.xwiki.contrib.solrsecurity.internal.SolrSecurityGroupManager
+org.xwiki.contrib.solrsecurity.internal.SolrSecurityJob
+org.xwiki.contrib.solrsecurity.internal.SolrSecurityListener
+org.xwiki.contrib.solrsecurity.internal.SolrSecurityStore
