@@ -19,10 +19,6 @@
  */
 package org.xwiki.contrib.solrsecurity.internal;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -41,7 +37,6 @@ import org.xwiki.model.reference.RegexEntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.AbstractEventListener;
 import org.xwiki.observation.event.Event;
-import org.xwiki.security.authorization.Right;
 
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -85,8 +80,7 @@ public class SolrSecurityListener extends AbstractEventListener
     private static final RegexEntityReference RIGHT_REFERENCE =
         BaseObjectReference.any(XWikiRightsDocumentInitializer.CLASS_REFERENCE_STRING);
 
-    private static final Set<String> RIGHTS = new HashSet<>(
-        Arrays.asList(Right.VIEW.getName(), Right.EDIT.getName(), Right.ADMIN.getName(), Right.PROGRAM.getName()));
+    private static final String GROUP_MEMBER = "member";
 
     @Inject
     private Logger logger;
@@ -123,7 +117,9 @@ public class SolrSecurityListener extends AbstractEventListener
             BaseObjectReference objectReference = (BaseObjectReference) ((XObjectEvent) event).getReference();
 
             XWikiDocument document = (XWikiDocument) source;
-            BaseObject xobject = document.getXObject(objectReference);
+            XWikiDocument oldDocument = document.getOriginalDocument();
+            BaseObject newXobject = document.getXObject(objectReference);
+            BaseObject oldXobject = oldDocument != null ? oldDocument.getXObject(objectReference) : null;
 
             if (GROUP_REFERENCE.equals(objectReference)) {
                 // It's a group member change
@@ -135,12 +131,14 @@ public class SolrSecurityListener extends AbstractEventListener
                     this.groupManager.invalidate(document.getDocumentReference().getWikiReference());
                 }
 
-                // Check member
-                String member = xobject.getStringValue("member");
-                DocumentReference memberReference =
-                    this.documentResolver.resolve(member, document.getDocumentReference());
-                if (this.groupManager.isGroup(memberReference)) {
-                    indexGroup(memberReference);
+                // Check removed member
+                if (oldXobject != null) {
+                    checkGroupMember(oldXobject.getStringValue(GROUP_MEMBER), document.getDocumentReference());
+                }
+
+                // Check new member
+                if (newXobject != null) {
+                    checkGroupMember(newXobject.getStringValue(GROUP_MEMBER), document.getDocumentReference());
                 }
             } else if (RIGHT_REFERENCE.equals(objectReference)) {
                 // It's a local right change
@@ -156,6 +154,14 @@ public class SolrSecurityListener extends AbstractEventListener
                     indexEntity(document.getDocumentReference().getWikiReference());
                 }
             }
+        }
+    }
+
+    private void checkGroupMember(String member, DocumentReference groupReference)
+    {
+        DocumentReference memberReference = this.documentResolver.resolve(member, groupReference);
+        if (this.groupManager.isGroup(memberReference)) {
+            indexGroup(memberReference);
         }
     }
 

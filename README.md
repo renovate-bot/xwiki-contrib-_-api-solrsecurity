@@ -4,7 +4,7 @@ Insert in the Solr search core a custom field containing all the groups which ha
 
 * Project Lead: [Thomas Mortagne](http://www.xwiki.org/xwiki/bin/view/XWiki/ThomasMortagne)
 * [Documentation & Downloads](http://extensions.xwiki.org/xwiki/bin/view/Extension/SolrSecurity/)
-* [Issue Tracker](http://jira.xwiki.org/browse/SCRIPTCOMP)
+* [Issue Tracker](http://jira.xwiki.org/browse/SOLRSECUR)
 * Communication: [Mailing List](http://dev.xwiki.org/xwiki/bin/view/Community/MailingLists), [IRC](http://dev.xwiki.org/xwiki/bin/view/Community/IRC)
 * [Development Practices](http://dev.xwiki.org)
 * Minimal XWiki version supported: XWiki 9.4
