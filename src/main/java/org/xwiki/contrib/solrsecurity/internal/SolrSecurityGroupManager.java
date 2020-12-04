@@ -102,16 +102,30 @@ public class SolrSecurityGroupManager
      */
     public Set<DocumentReference> getGroups(DocumentReference group) throws GroupException, XWikiException
     {
-        Collection<DocumentReference> members = this.groupManager.getMembers(group, true);
-
         Set<DocumentReference> groups = new HashSet<>();
-        for (DocumentReference member : members) {
-            if (getGroups(member.getWikiReference()).contains(member)) {
-                groups.add(member);
-            }
-        }
+
+        addGroups(group, groups);
 
         return groups;
+    }
+
+    private void addGroups(DocumentReference group, Set<DocumentReference> groups) throws GroupException, XWikiException
+    {
+        if (groups.contains(group)) {
+            return;
+        }
+
+        Collection<DocumentReference> members = this.groupManager.getMembers(group, true);
+
+        if (!members.isEmpty()) {
+            groups.add(group);
+
+            for (DocumentReference member : members) {
+                if (isGroup(member)) {
+                    addGroups(member, groups);
+                }
+            }
+        }
     }
 
     /**

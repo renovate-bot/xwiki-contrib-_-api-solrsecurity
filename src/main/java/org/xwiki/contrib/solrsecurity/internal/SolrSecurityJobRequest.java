@@ -19,6 +19,9 @@
  */
 package org.xwiki.contrib.solrsecurity.internal;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.xwiki.job.AbstractRequest;
 import org.xwiki.job.Request;
 import org.xwiki.model.reference.DocumentReference;
@@ -31,6 +34,13 @@ import org.xwiki.model.reference.EntityReference;
  */
 public class SolrSecurityJobRequest extends AbstractRequest
 {
+    /**
+     * The id used as prefix in the job ids.
+     */
+    public static final String ID_PREFIX = "solrsecurity";
+
+    private static final long serialVersionUID = 1L;
+
     private EntityReference entity;
 
     private DocumentReference groupReference;
@@ -50,6 +60,42 @@ public class SolrSecurityJobRequest extends AbstractRequest
     public SolrSecurityJobRequest(Request request)
     {
         super(request);
+    }
+
+    /**
+     * @param groupReference the group to index
+     * @return the id corresponding to the group to index
+     */
+    public static List<String> getIdForGroup(DocumentReference groupReference)
+    {
+        List<String> list = new ArrayList<>();
+
+        list.add(ID_PREFIX);
+        list.add("group");
+
+        for (EntityReference element : groupReference.getReversedReferenceChain()) {
+            list.add(element.getName());
+        }
+
+        return list;
+    }
+
+    /**
+     * @param entity the entity to index
+     * @return the id corresponding to the entity to index
+     */
+    public static List<String> getIdForEntity(EntityReference entity)
+    {
+        List<String> list = new ArrayList<>();
+
+        list.add(ID_PREFIX);
+        list.add("entity");
+
+        for (EntityReference element : entity.getReversedReferenceChain()) {
+            list.add(element.getName());
+        }
+
+        return list;
     }
 
     /**

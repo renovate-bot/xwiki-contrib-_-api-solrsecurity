@@ -20,14 +20,18 @@
 package org.xwiki.contrib.solrsecurity.internal;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.Map;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
+import org.apache.commons.lang3.StringUtils;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
@@ -52,8 +56,6 @@ import com.xpn.xwiki.XWikiException;
 @Singleton
 public class SolrSecurityIndexer
 {
-    private static final int DOCUMENT_QUERY_BATCH_SIZE = 100;
-
     @Inject
     private DocumentReferenceResolver<String> documentResolver;
 
@@ -72,6 +74,18 @@ public class SolrSecurityIndexer
 
     @Inject
     private SolrSecurityStore solrStore;
+
+    @Inject
+    private EntityReferenceSerializer<String> serializer;
+
+    private class DocumentRow
+    {
+        private DocumentReference documentReference;
+
+        private String documentString;
+
+        private List<String> languages = new ArrayList<>();
+    }
 
     /**
      * @param entity the entity to index
@@ -100,6 +114,27 @@ public class SolrSecurityIndexer
     }
 
     /**
+     * @param document the document to index
+     * @param groups the groups to index
+     * @throws XWikiException when failing to use the XWiki API
+     * @throws QueryException when failing to use execute database request
+     */
+    private void index(DocumentReference document, Collection<DocumentReference> groups) throws QueryException
+    {
+        DocumentReference referenceWithoutLocale;
+        List<String> locales;
+        if (document.getLocale() == null) {
+            referenceWithoutLocale = document;
+            locales = getLocales(document);
+        } else {
+            referenceWithoutLocale = new DocumentReference(document, (Locale) null);
+            locales = Arrays.asList(document.getLocale().toString());
+        }
+
+        index(referenceWithoutLocale, this.serializer.serialize(referenceWithoutLocale), locales, groups);
+    }
+
+    /**
      * @param wiki the wiki to index
      * @param groups the groups to index
      * @throws XWikiException when failing to use the XWiki API
@@ -113,34 +148,17 @@ public class SolrSecurityIndexer
             finalGroups = this.groupManager.getGroups(wiki);
         }
 
-        Query query = this.queryManager.getNamedQuery("getAllDocuments");
-
-        query.setWiki(wiki.getName());
-        query.setLimit(DOCUMENT_QUERY_BATCH_SIZE);
-
-        int offset = 0;
-        do {
-            query.setOffset(offset);
-
-            List<String> documentNames = query.execute();
-
-            for (String documentName : documentNames) {
-                index(this.documentResolver.resolve(documentName, wiki), finalGroups);
-            }
-
-            offset += documentNames.size();
-        } while ((offset % DOCUMENT_QUERY_BATCH_SIZE) == 0);
+        for (String childSpace : getSpaces(wiki.getName())) {
+            index(childSpace, wiki, finalGroups);
+        }
     }
 
     private void index(String space, WikiReference wiki, Collection<DocumentReference> groups) throws QueryException
     {
         // Index documents
-        List<DocumentReference> documents = getDocumentReferences(space, wiki);
-        for (DocumentReference document : documents) {
-            index(document, groups);
-        }
+        indexDocuments(space, wiki, groups);
 
-        // Index spaces
+        // Index sub spaces
         for (String childSpace : getSpaces(space, wiki.getName())) {
             index(childSpace, wiki, groups);
         }
@@ -157,30 +175,79 @@ public class SolrSecurityIndexer
         return query.execute();
     }
 
-    private List<DocumentReference> getDocumentReferences(String space, WikiReference wiki) throws QueryException
+    private List<String> getSpaces(String wiki) throws QueryException
     {
-        Query query = this.queryManager
-            .createQuery("select distinct doc.fullName from Document doc where doc.space = :space", Query.XWQL);
+        Query query = this.queryManager.getNamedQuery("getSpaces");
+        query.setWiki(wiki);
+
+        return query.execute();
+    }
+
+    private void indexDocuments(String space, WikiReference wiki, Collection<DocumentReference> groups)
+        throws QueryException
+    {
+        Query query = this.queryManager.createQuery(
+            "select doc.fullName, doc.language, doc.defaultLanguage from Document doc where doc.space = :space",
+            Query.XWQL);
         query.bindValue("space", space);
         query.setWiki(wiki.getName());
 
-        return query.<String>execute().stream().map(name -> this.documentResolver.resolve(name, wiki))
-            .collect(Collectors.toList());
+        List<Object[]> rows = query.execute();
+
+        Map<DocumentReference, DocumentRow> documents = new HashMap<>(rows.size());
+        for (Object[] row : rows) {
+            String documentString = wiki.getName() + ':' + (String) row[0];
+            DocumentReference documentReference = this.documentResolver.resolve(documentString);
+
+            DocumentRow documentRow = documents.get(documentReference);
+
+            if (documentRow == null) {
+                documentRow = new DocumentRow();
+                documentRow.documentString = documentString;
+                documentRow.documentReference = documentReference;
+
+                documents.put(documentReference, documentRow);
+            }
+
+            documentRow.languages.add(StringUtils.defaultIfEmpty((String) row[1], (String) row[2]));
+        }
+
+        for (DocumentRow document : documents.values()) {
+            index(document.documentReference, document.documentString, document.languages, groups);
+        }
     }
 
-    private void index(DocumentReference document, Collection<DocumentReference> groups)
+    private void index(DocumentReference document, String documentString, List<String> locales,
+        Collection<DocumentReference> groups)
     {
-        List<DocumentReference> allowedGroups = new ArrayList<>(groups.size());
-        List<DocumentReference> deniedGroups = new ArrayList<>(groups.size());
+        List<String> allowedGroups = new ArrayList<>(groups.size());
+        List<String> deniedGroups = new ArrayList<>(groups.size());
 
         for (DocumentReference group : groups) {
             if (this.authorization.hasAccess(Right.VIEW, group, document)) {
-                allowedGroups.add(group);
+                allowedGroups.add(this.serializer.serialize(group));
             } else {
-                deniedGroups.add(group);
+                deniedGroups.add(this.serializer.serialize(group));
             }
         }
 
-        this.solrStore.update(document, allowedGroups, deniedGroups);
+        this.solrStore.update(documentString, locales, allowedGroups, deniedGroups);
+    }
+
+    private List<String> getLocales(DocumentReference documentReference) throws QueryException
+    {
+        Query query = this.queryManager.createQuery(
+            "select doc.language, doc.defaultLanguage from Document doc where doc.fullName = :fullName", Query.XWQL);
+        query.bindValue("fullName", this.localSerializer.serialize(documentReference));
+        query.setWiki(documentReference.getWikiReference().getName());
+
+        List<Object[]> rows = query.execute();
+
+        List<String> locales = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            locales.add(StringUtils.defaultIfEmpty((String) row[0], (String) row[1]));
+        }
+
+        return locales;
     }
 }

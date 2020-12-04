@@ -25,8 +25,10 @@ import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.request.schema.SchemaRequest;
@@ -36,11 +38,10 @@ import org.slf4j.Logger;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.component.phase.Initializable;
 import org.xwiki.component.phase.InitializationException;
-import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.search.solr.Solr;
 import org.xwiki.search.solr.SolrException;
 import org.xwiki.search.solr.SolrUtils;
+import org.xwiki.search.solr.internal.reference.SolrReferenceResolver;
 
 /**
  * Default implementation of {@link SolrSecurityStore}.
@@ -53,6 +54,8 @@ public class SolrSecurityStore implements Initializable
 {
     private static final String SOLR_FIELD = "allowed";
 
+    private static final int BATCH_COMMIT_SIZE = 100;
+
     @Inject
     private Solr solr;
 
@@ -60,12 +63,15 @@ public class SolrSecurityStore implements Initializable
     private SolrUtils solrUtils;
 
     @Inject
-    private EntityReferenceSerializer<String> serializer;
-
-    @Inject
     private Logger logger;
 
+    @Inject
+    @Named("document")
+    private SolrReferenceResolver solrResolver;
+
     private SolrClient searchClient;
+
+    private int count;
 
     @Override
     public void initialize() throws InitializationException
@@ -101,22 +107,35 @@ public class SolrSecurityStore implements Initializable
      * @param document the document to update
      * @param allowedGroups the list of groups allowed to read this document
      * @param deniedGroups the list of groups denied to read this document
+     * @param locales the locales of the document to update
      */
-    public void update(DocumentReference document, List<DocumentReference> allowedGroups,
-        List<DocumentReference> deniedGroups)
+    public void update(String document, List<String> locales, List<String> allowedGroups, List<String> deniedGroups)
     {
         SolrInputDocument solrDocument = new SolrInputDocument();
 
-        this.solrUtils.set("id", this.serializer.serialize(document) + '_', solrDocument);
+        for (String locale : locales) {
+            this.solrUtils.set("id", document + '_' + (StringUtils.isEmpty(locale) ? "" : locale), solrDocument);
 
-        this.solrUtils.setAtomic(SolrUtils.ATOMIC_UPDATE_MODIFIER_ADD_DISTINCT, SOLR_FIELD, allowedGroups,
-            solrDocument);
-        this.solrUtils.setAtomic(SolrUtils.ATOMIC_UPDATE_MODIFIER_REMOVE, SOLR_FIELD, deniedGroups, solrDocument);
+            Map<String, List<String>> value = new HashMap<>();
+            if (!allowedGroups.isEmpty()) {
+                value.put(SolrUtils.ATOMIC_UPDATE_MODIFIER_ADD_DISTINCT, allowedGroups);
+            }
+            if (!deniedGroups.isEmpty()) {
+                value.put(SolrUtils.ATOMIC_UPDATE_MODIFIER_REMOVE, deniedGroups);
+            }
+            solrDocument.setField(SOLR_FIELD, value);
 
-        try {
-            this.searchClient.add(solrDocument);
-        } catch (Exception e) {
-            this.logger.error("Failed to update solr document", e);
+            try {
+                this.searchClient.add(solrDocument);
+
+                ++this.count;
+
+                if (this.count >= BATCH_COMMIT_SIZE) {
+                    this.commit();
+                }
+            } catch (Exception e) {
+                this.logger.error("Failed to update solr document", e);
+            }
         }
     }
 
@@ -128,6 +147,8 @@ public class SolrSecurityStore implements Initializable
      */
     public void commit() throws SolrServerException, IOException
     {
+        this.count = 0;
+
         this.searchClient.commit();
     }
 }
