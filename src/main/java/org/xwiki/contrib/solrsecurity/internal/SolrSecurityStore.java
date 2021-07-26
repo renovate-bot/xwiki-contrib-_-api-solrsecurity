@@ -97,8 +97,8 @@ public class SolrSecurityStore implements Initializable
 
                 this.searchClient.commit();
             } catch (Exception e1) {
-                throw new InitializationException("Faield add the file [" + SOLR_FIELD + "] in the Solr search core",
-                    e);
+                throw new InitializationException(
+                    "Failed to add the field [" + SOLR_FIELD + "] in the Solr search core", e);
             }
         }
     }
