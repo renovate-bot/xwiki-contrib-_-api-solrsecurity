@@ -111,6 +111,10 @@ public class SolrSecurityStore implements Initializable
      */
     public void update(String document, List<String> locales, List<String> allowedGroups, List<String> deniedGroups)
     {
+        this.logger.debug(
+            "Updating allowed property for document [{}] and locales {} with allowed groups {} and denied groups {}",
+            document, locales, allowedGroups, deniedGroups);
+
         SolrInputDocument solrDocument = new SolrInputDocument();
 
         for (String locale : locales) {
