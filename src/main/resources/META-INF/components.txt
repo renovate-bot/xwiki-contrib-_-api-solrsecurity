@@ -1,3 +1,5 @@
+500:org.xwiki.contrib.solrsecurity.internal.CustomDocumentSolrMetadataExtractor
+org.xwiki.contrib.solrsecurity.internal.SolrSecurityDispatcher
 org.xwiki.contrib.solrsecurity.internal.SolrSecurityGroupManager
 org.xwiki.contrib.solrsecurity.internal.SolrSecurityIndexer
 org.xwiki.contrib.solrsecurity.internal.SolrSecurityJob

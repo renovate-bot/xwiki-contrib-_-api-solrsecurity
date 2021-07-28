@@ -52,7 +52,7 @@ import org.xwiki.search.solr.internal.reference.SolrReferenceResolver;
 @Singleton
 public class SolrSecurityStore implements Initializable
 {
-    private static final String SOLR_FIELD = "allowed";
+    static final String SOLR_FIELD = "allowed";
 
     private static final int BATCH_COMMIT_SIZE = 100;
 
@@ -130,6 +130,8 @@ public class SolrSecurityStore implements Initializable
             solrDocument.setField(SOLR_FIELD, value);
 
             try {
+                this.logger.debug("Adding Solr document [{}]", solrDocument.toString());
+
                 this.searchClient.add(solrDocument);
 
                 ++this.count;

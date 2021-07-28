@@ -19,27 +19,17 @@
  */
 package org.xwiki.contrib.solrsecurity.internal;
 
-import java.util.List;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.slf4j.Logger;
 import org.xwiki.bridge.event.ApplicationReadyEvent;
-import org.xwiki.bridge.event.DocumentCreatedEvent;
 import org.xwiki.bridge.event.WikiDeletedEvent;
 import org.xwiki.bridge.event.WikiEvent;
 import org.xwiki.bridge.event.WikiReadyEvent;
 import org.xwiki.component.annotation.Component;
-import org.xwiki.job.JobException;
-import org.xwiki.job.JobExecutor;
-import org.xwiki.job.JobStatusStore;
-import org.xwiki.job.event.status.JobStatus;
-import org.xwiki.job.event.status.JobStatus.State;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.DocumentReferenceResolver;
-import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.LocalDocumentReference;
 import org.xwiki.model.reference.RegexEntityReference;
 import org.xwiki.model.reference.WikiReference;
@@ -92,19 +82,13 @@ public class SolrSecurityListener extends AbstractEventListener
     private static final String GROUP_MEMBER = "member";
 
     @Inject
-    private Logger logger;
-
-    @Inject
-    private JobExecutor jobs;
-
-    @Inject
-    private JobStatusStore jobsStore;
-
-    @Inject
     private DocumentReferenceResolver<String> documentResolver;
 
     @Inject
     private SolrSecurityGroupManager groupManager;
+
+    @Inject
+    private SolrSecurityDispatcher dispatcher;
 
     /**
      * The default constructor.
@@ -112,11 +96,11 @@ public class SolrSecurityListener extends AbstractEventListener
     public SolrSecurityListener()
     {
         super(NAME, new ApplicationReadyEvent(), new WikiReadyEvent(), new WikiDeletedEvent(),
-            new DocumentCreatedEvent(), new XObjectAddedEvent(GROUP_REFERENCE),
-            new XObjectDeletedEvent(GROUP_REFERENCE), new XObjectUpdatedEvent(GROUP_REFERENCE),
-            new XObjectAddedEvent(GLOBALRIGHT_REFERENCE), new XObjectDeletedEvent(GLOBALRIGHT_REFERENCE),
-            new XObjectUpdatedEvent(GLOBALRIGHT_REFERENCE), new XObjectAddedEvent(RIGHT_REFERENCE),
-            new XObjectDeletedEvent(RIGHT_REFERENCE), new XObjectUpdatedEvent(RIGHT_REFERENCE));
+            new XObjectAddedEvent(GROUP_REFERENCE), new XObjectDeletedEvent(GROUP_REFERENCE),
+            new XObjectUpdatedEvent(GROUP_REFERENCE), new XObjectAddedEvent(GLOBALRIGHT_REFERENCE),
+            new XObjectDeletedEvent(GLOBALRIGHT_REFERENCE), new XObjectUpdatedEvent(GLOBALRIGHT_REFERENCE),
+            new XObjectAddedEvent(RIGHT_REFERENCE), new XObjectDeletedEvent(RIGHT_REFERENCE),
+            new XObjectUpdatedEvent(RIGHT_REFERENCE));
     }
 
     @Override
@@ -125,13 +109,9 @@ public class SolrSecurityListener extends AbstractEventListener
         if (event instanceof WikiDeletedEvent) {
             // Invalidate the group cache for the deleted wiki
             this.groupManager.invalidate(new WikiReference(((WikiEvent) event).getWikiId()));
-        } else if (event instanceof DocumentCreatedEvent) {
-            // Index the new document
-            XWikiDocument document = (XWikiDocument) source;
-            indexEntity(new DocumentReference(document.getDocumentReference(), document.getRealLocale()), true);
         } else if (event instanceof ApplicationReadyEvent || event instanceof WikiReadyEvent) {
             // Make sure the wiki is indexed at startup
-            indexEntity(((XWikiContext) data).getWikiReference(), false);
+            this.dispatcher.indexEntity(((XWikiContext) data).getWikiReference(), false);
         } else if (event instanceof XObjectEvent) {
             BaseObjectReference objectReference = (BaseObjectReference) ((XObjectEvent) event).getReference();
 
@@ -161,16 +141,17 @@ public class SolrSecurityListener extends AbstractEventListener
                 }
             } else if (RIGHT_REFERENCE.equals(objectReference)) {
                 // It's a local right change
-                indexEntity(document.getDocumentReference(), true);
+                // We don't indicate a specific locale since the right change affect all locales of the document
+                this.dispatcher.indexEntity(document.getDocumentReference(), true);
             } else if (GLOBALRIGHT_REFERENCE.equals(objectReference)) {
                 // It's a global right change
                 if (document.getDocumentReference().getName().equals(SPACEPREFERENCE_NAME)) {
                     // It's a global space right change
-                    indexEntity(document.getDocumentReference().getLastSpaceReference(), true);
+                    this.dispatcher.indexEntity(document.getDocumentReference().getLastSpaceReference(), true);
                 } else if (document.getDocumentReference().getLocalDocumentReference()
                     .equals(WIKIPREFERENCE_REFERENCE)) {
                     // It's a global wiki right change
-                    indexEntity(document.getDocumentReference().getWikiReference(), true);
+                    this.dispatcher.indexEntity(document.getDocumentReference().getWikiReference(), true);
                 }
             }
         }
@@ -180,57 +161,7 @@ public class SolrSecurityListener extends AbstractEventListener
     {
         DocumentReference memberReference = this.documentResolver.resolve(member, groupReference);
         if (this.groupManager.isGroup(memberReference)) {
-            indexGroup(memberReference);
-        }
-    }
-
-    private void indexEntity(EntityReference reference, boolean force)
-    {
-        List<String> id = SolrSecurityJobRequest.getIdForEntity(reference);
-
-        if (shouldIndex(id, force)) {
-            SolrSecurityJobRequest request = new SolrSecurityJobRequest();
-
-            request.setId(id);
-
-            request.setEntity(reference);
-
-            execute(request);
-        }
-    }
-
-    private void indexGroup(DocumentReference groupReference)
-    {
-        SolrSecurityJobRequest request = new SolrSecurityJobRequest();
-
-        request.setId(SolrSecurityJobRequest.getIdForGroup(groupReference));
-
-        request.setGroupReference(groupReference);
-
-        execute(request);
-    }
-
-    private boolean shouldIndex(List<String> id, boolean force)
-    {
-        if (force) {
-            return true;
-        }
-
-        if (this.jobs.getJob(id) != null) {
-            return false;
-        }
-
-        JobStatus status = this.jobsStore.getJobStatus(id);
-
-        return status == null || status.getState() != State.FINISHED;
-    }
-
-    private void execute(SolrSecurityJobRequest request)
-    {
-        try {
-            this.jobs.execute(SolrSecurityJob.JOBTYPE, request);
-        } catch (JobException e) {
-            this.logger.error("Failed to start the job for request [{}]", request, e);
+            this.dispatcher.indexGroup(memberReference);
         }
     }
 }
