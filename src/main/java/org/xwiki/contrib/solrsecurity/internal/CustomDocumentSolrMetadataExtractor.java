@@ -64,7 +64,7 @@ public class CustomDocumentSolrMetadataExtractor extends DocumentSolrMetadataExt
         value.put(SolrUtils.ATOMIC_UPDATE_MODIFIER_ADD, Collections.emptyList());
         solrDocument.setField(SolrSecurityStore.SOLR_FIELD, value);
 
-        // Also trigger a rights reindex in case it's a new solr document or the index was resetted
+        // Also trigger a rights reindex in case it's a new solr document or the index was reseted
         // Get the "real" locale since that's what the Solr document id is based on
         XWikiDocument translatedDocument = getTranslatedDocument(new DocumentReference(entityReference));
         this.dispatcher.indexEntity(
