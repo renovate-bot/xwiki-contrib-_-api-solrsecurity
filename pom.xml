@@ -35,8 +35,12 @@
   <description>Insert in the Solr search core a custom field containing all the groups which have view right on the document</description>
 
   <properties>
+    <!-- Auto release on JIRA -->
     <xwiki.release.jira.skip>false</xwiki.release.jira.skip>
     <xwiki.issueManagement.jira.id>SOLRSECUR</xwiki.issueManagement.jira.id>
+
+    <!-- This extension should be installed on root namespace -->
+    <xwiki.extension.namespaces>{root}</xwiki.extension.namespaces>
   </properties>
 
   <dependencies>
