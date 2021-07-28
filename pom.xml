@@ -29,7 +29,7 @@
   </parent>
 
   <artifactId>solrsecurity</artifactId>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>1.0.1</version>
 
   <name>Solr Security</name>
   <description>Insert in the Solr search core a custom field containing all the groups which have view right on the document</description>
@@ -67,7 +67,7 @@
     <connection>scm:git:git://github.com/xwiki-contrib/api-solrsecurity.git</connection>
     <developerConnection>scm:git:git@github.com:xwiki-contrib/api-solrsecurity.git</developerConnection>
     <url>https://github.com/xwiki-contrib/api-solrsecurity</url>
-    <tag>HEAD</tag>
+    <tag>solrsecurity-1.0.1</tag>
   </scm>
 
   <build>
