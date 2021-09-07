@@ -3,7 +3,7 @@
 Insert in the Solr search core a custom field containing all the groups which have view right on the document.
 
 * Project Lead: [Thomas Mortagne](http://www.xwiki.org/xwiki/bin/view/XWiki/ThomasMortagne)
-* [Documentation & Downloads](http://extensions.xwiki.org/xwiki/bin/view/Extension/SolrSecurity/)
+* [Documentation & Downloads](http://extensions.xwiki.org/xwiki/bin/view/Extension/Solr+Security/)
 * [Issue Tracker](http://jira.xwiki.org/browse/SOLRSECUR)
 * Communication: [Mailing List](http://dev.xwiki.org/xwiki/bin/view/Community/MailingLists), [IRC](http://dev.xwiki.org/xwiki/bin/view/Community/IRC)
 * [Development Practices](http://dev.xwiki.org)
