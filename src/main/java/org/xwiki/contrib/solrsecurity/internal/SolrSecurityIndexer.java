@@ -116,7 +116,6 @@ public class SolrSecurityIndexer
     /**
      * @param document the document to index
      * @param groups the groups to index
-     * @throws XWikiException when failing to use the XWiki API
      * @throws QueryException when failing to use execute database request
      */
     private void index(DocumentReference document, Collection<DocumentReference> groups) throws QueryException
