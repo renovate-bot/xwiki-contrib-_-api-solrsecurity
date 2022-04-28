@@ -19,11 +19,6 @@
  */
 package org.xwiki.contrib.solrsecurity.internal;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -31,14 +26,11 @@ import javax.inject.Singleton;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
-import org.xwiki.search.solr.SolrUtils;
 import org.xwiki.search.solr.internal.metadata.DocumentSolrMetadataExtractor;
 import org.xwiki.search.solr.internal.metadata.LengthSolrInputDocument;
 
-import com.xpn.xwiki.doc.XWikiDocument;
-
 /**
- * Overwrite the standard {@link DocumentSolrMetadataExtractor} to avoid the overwriting of the "allowed" field.
+ * Overwrite the standard {@link DocumentSolrMetadataExtractor} to trigger the injection of the "allowed" field.
  * <p>
  * TODO: introduce an extension point in XWiki Standard to avoid manipulating internal classes here.
  * 
@@ -50,7 +42,7 @@ import com.xpn.xwiki.doc.XWikiDocument;
 public class CustomDocumentSolrMetadataExtractor extends DocumentSolrMetadataExtractor
 {
     @Inject
-    private SolrSecurityDispatcher dispatcher;
+    private SolrSecurityIndexer indexer;
 
     @Override
     public boolean setFieldsInternal(LengthSolrInputDocument solrDocument, EntityReference entityReference)
@@ -58,17 +50,12 @@ public class CustomDocumentSolrMetadataExtractor extends DocumentSolrMetadataExt
     {
         boolean indexed = super.setFieldsInternal(solrDocument, entityReference);
 
-        // Make sure the "allowed" field (which has it's won update process) is not overwritten
-        // The trick is to use an empty atomic update
-        Map<String, List<String>> value = new HashMap<>();
-        value.put(SolrUtils.ATOMIC_UPDATE_MODIFIER_ADD, Collections.emptyList());
-        solrDocument.setField(SolrSecurityStore.SOLR_FIELD, value);
+        // Inject information about groups access to the document
+        if (indexed) {
+            DocumentReference documentReference = new DocumentReference(entityReference);
 
-        // Also trigger a rights reindex in case it's a new solr document or the index was reseted
-        // Get the "real" locale since that's what the Solr document id is based on
-        XWikiDocument translatedDocument = getTranslatedDocument(new DocumentReference(entityReference));
-        this.dispatcher.indexEntity(
-            new DocumentReference(translatedDocument.getDocumentReference(), translatedDocument.getRealLocale()), true);
+            this.indexer.index(documentReference, solrDocument);
+        }
 
         return indexed;
     }

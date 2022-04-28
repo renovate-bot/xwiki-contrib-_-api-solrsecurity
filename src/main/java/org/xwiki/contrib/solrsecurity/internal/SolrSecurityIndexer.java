@@ -32,6 +32,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.solr.common.SolrInputDocument;
 import org.xwiki.component.annotation.Component;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
@@ -231,6 +232,29 @@ public class SolrSecurityIndexer
         }
 
         this.solrStore.update(documentString, locales, allowedGroups, deniedGroups);
+    }
+
+    /**
+     * @param document the reference of the document to index
+     * @param solrDocument the {@link SolrInputDocument} in which to insert the result
+     * @throws XWikiException when failing to gather the groups to index
+     */
+    public void index(DocumentReference document, SolrInputDocument solrDocument) throws XWikiException
+    {
+        index(document, this.groupManager.getGroups(document.getWikiReference()), solrDocument);
+    }
+
+    private void index(DocumentReference document, Collection<DocumentReference> groups, SolrInputDocument solrDocument)
+    {
+        List<String> allowedGroups = new ArrayList<>(groups.size());
+
+        for (DocumentReference group : groups) {
+            if (this.authorization.hasAccess(Right.VIEW, group, document)) {
+                allowedGroups.add(this.serializer.serialize(group));
+            }
+        }
+
+        solrDocument.setField(SolrSecurityStore.SOLR_FIELD, allowedGroups);
     }
 
     private List<String> getLocales(DocumentReference documentReference) throws QueryException
