@@ -96,9 +96,14 @@ public class SolrSecurityListener extends AbstractEventListener
     public SolrSecurityListener()
     {
         super(NAME, new ApplicationReadyEvent(), new WikiReadyEvent(), new WikiDeletedEvent(),
+            // A group has been add/deleted or a member has been added/deleted: need to update add or remove this group
+            // in the index and the new/old member if it's a group
             new XObjectAddedEvent(GROUP_REFERENCE), new XObjectDeletedEvent(GROUP_REFERENCE),
-            new XObjectUpdatedEvent(GROUP_REFERENCE), new XObjectAddedEvent(GLOBALRIGHT_REFERENCE),
-            new XObjectDeletedEvent(GLOBALRIGHT_REFERENCE), new XObjectUpdatedEvent(GLOBALRIGHT_REFERENCE),
+            new XObjectUpdatedEvent(GROUP_REFERENCE),
+            // A global right has been updated: need to update the index of all the children of that entity
+            new XObjectAddedEvent(GLOBALRIGHT_REFERENCE), new XObjectDeletedEvent(GLOBALRIGHT_REFERENCE),
+            new XObjectUpdatedEvent(GLOBALRIGHT_REFERENCE),
+            // A document right has been updated: need to update the index of all the locales of that document
             new XObjectAddedEvent(RIGHT_REFERENCE), new XObjectDeletedEvent(RIGHT_REFERENCE),
             new XObjectUpdatedEvent(RIGHT_REFERENCE));
     }
