@@ -79,7 +79,7 @@ public class SolrSecurityIndexer
     @Inject
     private EntityReferenceSerializer<String> serializer;
 
-    private class DocumentRow
+    private final class DocumentRow
     {
         private DocumentReference documentReference;
 
