@@ -23,40 +23,40 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
+import org.apache.solr.common.SolrInputDocument;
+import org.slf4j.Logger;
 import org.xwiki.component.annotation.Component;
-import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.EntityReference;
+import org.xwiki.search.solr.SolrEntityMetadataExtractor;
 import org.xwiki.search.solr.internal.metadata.DocumentSolrMetadataExtractor;
-import org.xwiki.search.solr.internal.metadata.LengthSolrInputDocument;
+
+import com.xpn.xwiki.XWikiException;
+import com.xpn.xwiki.doc.XWikiDocument;
 
 /**
- * Overwrite the standard {@link DocumentSolrMetadataExtractor} to trigger the injection of the "allowed" field.
- * <p>
- * TODO: introduce an extension point in XWiki Standard to avoid manipulating internal classes here.
+ * Inject Overwrite the standard {@link DocumentSolrMetadataExtractor} to trigger the injection of the "allowed" field.
  * 
  * @version $Id$
  */
 @Component
 @Named("document")
 @Singleton
-public class CustomDocumentSolrMetadataExtractor extends DocumentSolrMetadataExtractor
+public class CustomDocumentSolrMetadataExtractor implements SolrEntityMetadataExtractor<XWikiDocument>
 {
     @Inject
     private SolrSecurityIndexer indexer;
 
+    @Inject
+    private Logger logger;
+
     @Override
-    public boolean setFieldsInternal(LengthSolrInputDocument solrDocument, EntityReference entityReference)
-        throws Exception
+    public boolean extract(XWikiDocument entity, SolrInputDocument solrDocument)
     {
-        boolean indexed = super.setFieldsInternal(solrDocument, entityReference);
-
-        // Inject information about groups access to the document
-        if (indexed) {
-            DocumentReference documentReference = new DocumentReference(entityReference);
-
-            this.indexer.index(documentReference, solrDocument);
+        try {
+            this.indexer.index(entity.getDocumentReference(), solrDocument);
+        } catch (XWikiException e) {
+            this.logger.error("Failed to index the right for document [{}]", entity.getDocumentReference(), e);
         }
 
-        return indexed;
+        return true;
     }
 }
